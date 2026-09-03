@@ -29,6 +29,14 @@ jobs:
         pip install seleniumbase requests
         seleniumbase install chromedriver
 
+    - name: 🔄 同步上游最新脚本（排除工作流）
+      continue-on-error: true # 即使上游挂了或网络不好，也继续用本地代码运行，不耽误续期
+      run: |
+        git remote add upstream https://github.com/eooce/katabump-renew
+        git fetch upstream main
+        echo "正在检查并同步上游核心代码..."
+        git checkout upstream/main -- app.py README.md 2>/dev/null || echo "未发现核心文件变化"
+
     - name: ⚙ 设置代理 (sing-box)
       continue-on-error: true
       env:
@@ -83,8 +91,8 @@ jobs:
       if: always()
       run: |
         git config --global user.name "github-actions[bot]"
-        git config --global user.email "41898282+github-actions[bot]@://github.com"
-        git add .github/workflows/renew.yml
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add .github/workflows/renew.yml app.py README.md
         git commit -m "chore: 🎲 混淆防检测，动态更新明日凌晨触发时间" || echo "没有检测到时间格式改变，跳过提交"
         git push origin main
 
