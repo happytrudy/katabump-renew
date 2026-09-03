@@ -13,7 +13,6 @@ jobs:
     permissions:
       actions: write  
       contents: write
-      workflows: write
     
     steps:
     - name: 📥 检出代码
