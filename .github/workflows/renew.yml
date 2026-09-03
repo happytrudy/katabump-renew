@@ -69,13 +69,12 @@ jobs:
         
         new_cron = f"{rand_min} {rand_hour_utc} * * *"
         
-        # 修正：精准匹配你指定的 renew.yml 文件
         file_path = '.github/workflows/renew.yml' 
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
             
-        # 正则替换旧的 cron 表达式
-        updated_content = re.sub(r"- cron: '1 21 * * *'", f"- cron: '1 21 * * *'", content)
+        # 🚨 核心修复：改用通用正则表达式匹配任意旧的 cron 时间，并将其真正替换为最新的随机时间变量
+        updated_content = re.sub(r"- cron: '.*?'", f"- cron: '{new_cron}'", content)
         
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(updated_content)
