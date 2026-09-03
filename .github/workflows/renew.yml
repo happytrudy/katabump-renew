@@ -4,7 +4,7 @@ on:
   schedule:
     # 第一次部署后的默认初始时间：北京时间凌晨 02:22 (UTC 18:22)
     # 之后每天运行完，这个数字会被脚本自动改成北京时间凌晨 1:00~5:00 之间的随机时间
-    - cron: '22 18 * * *'  
+    - cron: '1 21 * * *'  
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -67,7 +67,7 @@ jobs:
             content = f.read()
             
         # 正则替换旧的 cron 表达式
-        updated_content = re.sub(r"- cron: '.*?'", f"- cron: '{new_cron}'", content)
+        updated_content = re.sub(r"- cron: '1 21 * * *'", f"- cron: '1 21 * * *'", content)
         
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(updated_content)
