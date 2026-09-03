@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write  
-      contents: write # 必须赋予写权限，以便自动更新 cron 表达式并推送
+      contents: write
+      workflows: write
     
     steps:
     - name: 📥 检出代码
