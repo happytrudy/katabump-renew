@@ -13,6 +13,11 @@ jobs:
       contents: read
     
     steps:
+    - name: ⏳ 深度随机延迟（防检测核心）
+      run: |
+        delay=$((1 + RANDOM % 120))
+        echo "⏰ 为了防止被官方和CF盾检测，随机等待 $delay 分钟后开始执行..."
+        sleep $((delay * 60))
     - uses: actions/checkout@v6
     - name: ⚙ 设置 Python
       uses: actions/setup-python@v6
