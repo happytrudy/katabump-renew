@@ -2,7 +2,9 @@ name: Katabump Auto Renew
 
 on:
   schedule:
-  - cron: '0 2 */3 * *'  # 每天 UTC 0点 (北京时间 8点) 运行,根据服务到期时间自行修改
+    # 第一次部署后的默认初始时间：北京时间凌晨 02:22 (UTC 18:22)
+    # 之后每天运行完，这个数字会被脚本自动改成北京时间凌晨 1:00~5:00 之间的随机时间
+    - cron: '22 18 * * *'  
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -10,21 +12,18 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write  
-      contents: read
+      contents: write # 必须赋予写权限，以便自动更新 cron 表达式并推送
     
     steps:
-    - name: ⏳ 深度随机延迟（防检测核心）
-      run: |
-        delay=$((1 + RANDOM % 120))
-        echo "⏰ 为了防止被官方和CF盾检测，随机等待 $delay 分钟后开始执行..."
-        sleep $((delay * 60))
-    - uses: actions/checkout@v6
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+
     - name: ⚙ 设置 Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
         python-version: '3.12'
 
-    - name: 🛠️ 安装系统依赖和python依赖
+    - name: 🛠️ 安装系统依赖和 python 依赖
       run: |
         sudo apt-get update
         sudo apt-get install -y xvfb x11-utils xdotool scrot fonts-noto-cjk
@@ -38,6 +37,7 @@ jobs:
       run: |
         bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh)
 
+    # 🚀 随开随跑，不使用 sleep 挂机，0额度浪费
     - name: 🚀 运行续期脚本
       env:
         KATABUMP_EMAIL: ${{ secrets.KATABUMP_EMAIL }}
@@ -47,7 +47,48 @@ jobs:
       run: |
         xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
           python3 app.py
+
+    # 🎲 动态重写明天的随机 Cron 时间（限定北京时间凌晨）
+    - name: 🎲 动态重写明天的随机 Cron 时间
+      if: always() # 无论续期成功或失败，都必须更换明天的时间，防止被官方日志风控
+      run: |
+        import random, re
         
+        # 随机生成分钟 (1-59)
+        rand_min = random.randint(1, 59)
+        
+        # 锁定北京时间凌晨 01:00 到 05:00 (对应 UTC 时间 17:00 到 21:00)
+        rand_hour_utc = random.randint(17, 21)
+        
+        new_cron = f"{rand_min} {rand_hour_utc} * * *"
+        
+        # 修正：精准匹配你指定的 renew.yml 文件
+        file_path = '.github/workflows/renew.yml' 
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # 正则替换旧的 cron 表达式
+        updated_content = re.sub(r"- cron: '.*?'", f"- cron: '{new_cron}'", content)
+        
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(updated_content)
+            
+        # 计算并打印出对应的北京时间，方便在日志里肉眼对账
+        bj_hour = (rand_hour_utc + 8) % 24
+        print(f"🎲 成功生成明日随机触发时间 (UTC): {new_cron}")
+        print(f"⏰ 对应北京时间约为: 凌晨 {bj_hour:02d}:{rand_min:02d}")
+      shell: python
+
+    # 📤 推送新时间回仓库
+    - name: 📤 推送明日随机时间至仓库
+      if: always()
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@://github.com"
+        git add .github/workflows/renew.yml
+        git commit -m "chore: 🎲 混淆防检测，动态更新明日凌晨触发时间" || echo "没有检测到时间格式改变，跳过提交"
+        git push origin main
+
     - name: 🧹 清理旧的工作流运行记录
       if: always()
       env:
