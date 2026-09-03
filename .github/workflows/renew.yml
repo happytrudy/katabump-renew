@@ -10,13 +10,12 @@ on:
 jobs:
   Renew-Katabump:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write  
-      contents: write
     
     steps:
     - name: 📥 检出代码
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.MY_WORKFLOW_TOKEN }}
 
     - name: ⚙ 设置 Python
       uses: actions/setup-python@v5
@@ -92,7 +91,7 @@ jobs:
     - name: 🧹 清理旧的工作流运行记录
       if: always()
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ secrets.MY_WORKFLOW_TOKEN }}
       run: |
         runs=$(gh run list --workflow="${{ github.workflow }}" --limit=100 --json databaseId --jq '.[].databaseId')
         count=0
