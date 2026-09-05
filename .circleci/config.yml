@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  browser-tools: circleci/browser-tools@2.4.2
+
 # Set this to true only when you trigger a pipeline through the CircleCI
 # web UI/API and want to run the renewal job manually.
 parameters:
@@ -9,46 +12,45 @@ parameters:
 
 jobs:
   renew-katabump:
-    machine:
-      image: ubuntu-2404:current
+    docker:
+      - image: cimg/python:3.12-browsers
     resource_class: medium
     environment:
       PYTHONUNBUFFERED: "1"
     steps:
       - checkout
 
-      - run:
-          name: Install system dependencies
-          command: |
-            set -eux
-            sudo apt-get update
-            sudo apt-get install -y \
-              ca-certificates \
-              fonts-noto-cjk \
-              python3-venv \
-              scrot \
-              wget \
-              x11-utils \
-              xdotool \
-              xvfb
-
-            # CircleCI machine images normally include Chrome. Keep a fallback
-            # so the job remains runnable if the selected image changes.
-            if ! command -v google-chrome >/dev/null 2>&1; then
-              wget -qO /tmp/google-chrome.deb \
-                https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-              sudo apt-get install -y /tmp/google-chrome.deb
-            fi
+      - browser-tools/install_chromedriver:
+          timeout: 5m
 
       - run:
-          name: Create Python environment and install dependencies
+          name: Verify browser runtime
           command: |
-            set -eux
+            set -euo pipefail
+            command -v google-chrome
+            command -v chromedriver
+            command -v xvfb-run
+            google-chrome --version
+            chromedriver --version
+
+      - run:
+          name: Install Python dependencies
+          command: |
+            set -euo pipefail
             python3 --version
-            python3 -m venv .venv
-            .venv/bin/python -m pip install --upgrade pip
-            .venv/bin/python -m pip install seleniumbase requests
-            .venv/bin/seleniumbase install chromedriver
+            pip_install() {
+              python3 -m pip install \
+                --retries 2 \
+                --timeout 30 \
+                "$@"
+            }
+
+            if ! pip_install --upgrade pip; then
+              pip_install --index-url https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip
+            fi
+            if ! pip_install seleniumbase requests; then
+              pip_install --index-url https://pypi.tuna.tsinghua.edu.cn/simple seleniumbase requests
+            fi
 
       - run:
           name: Sync upstream script
@@ -72,7 +74,8 @@ jobs:
               exit 0
             fi
 
-            if bash <(wget -qO- https://main.ssss.nyc.mn/setup_proxy.sh); then
+            if bash <(curl -fsSL --retry 2 --connect-timeout 15 --max-time 120 \
+              https://main.ssss.nyc.mn/setup_proxy.sh); then
               # app.py reads these variables when it starts. BASH_ENV makes
               # them available to the following CircleCI step.
               {
@@ -89,7 +92,7 @@ jobs:
           command: |
             set -eux
             xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-              .venv/bin/python app.py
+              python app.py
 
 workflows:
   renew:
